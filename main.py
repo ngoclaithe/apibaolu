@@ -31,10 +31,22 @@ def get_weather_data(location: str):
 
         data = response.json()
         print("Giá trị data", data)
+
         temperature_kelvin = data["main"]["temp"]
         humidity = data["main"]["humidity"]
 
-        return temperature_kelvin, humidity
+        wind = data.get("wind", {})
+        rain = data.get("rain", {})
+
+        result = {
+            "temperature": temperature_kelvin,
+            "humidity": humidity
+        }
+        if wind:
+            result["wind"] = wind
+        if rain:
+            result["rain"] = rain
+        return result
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=400, detail=f"Error fetching weather data: {str(e)}")
 
@@ -97,13 +109,17 @@ async def predict(request: PredictionRequest):
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error during prediction: {str(e)}")
-
 @app.post("/predict/location")
 async def predict_location(request: LocationRequest):
     try:
         location = request.location
         
-        temperature_kelvin, humidity = get_weather_data(location)
+        weather_data = get_weather_data(location)
+        temperature_kelvin = weather_data.get("temperature")
+        humidity = weather_data.get("humidity")
+        wind = weather_data.get("wind", "Không có dữ liệu")  
+        rain = weather_data.get("rain", "Không có dữ liệu")  
+
         temperature_celsius = kelvin_to_celsius(temperature_kelvin)
         temperature_celsius = format_two_decimals(temperature_celsius)
         humidity = format_two_decimals(humidity)
@@ -119,15 +135,20 @@ async def predict_location(request: LocationRequest):
         predicted_temperature = format_two_decimals(prediction[0][0])
         predicted_humidity = format_two_decimals(prediction[0][1])
 
-        return {
+        response = {
             "predicted_temperature": predicted_temperature,
             "predicted_humidity": predicted_humidity,
             "actual_temperature": temperature_celsius,
-            "actual_humidity": humidity
+            "actual_humidity": humidity,
+            "wind": wind,  
+            "rain": rain   
         }
+
+        return response
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error during prediction: {str(e)}")
+
 
 @app.get("/get_data")
 async def get_data():
